@@ -4,7 +4,7 @@
 Defines the manager and dev agent roles, their orchestration contract (item selection, retry budget, self-validation, self-improvement), permission scope, and the Claude Code subagent surface.
 ## Requirements
 ### Requirement: Manager agent role
-The system SHALL define a `nightshift-manager` subagent that orchestrates shift execution. The manager SHALL read `manager.md`, `table.csv`, and the shift's `.env` file (if present), determine which items need processing, resolve per-task execution-config fields (`model`, `working_dir`, `worktree`) using item data and shift metadata, and dispatch work to dev subprocesses via the Bash tool (`${CLAUDE_SKILL_DIR}/scripts/dispatch-batch.sh`). The manager SHALL be responsible for applying step improvements to task files based on dev subprocess recommendations, unless `disable-self-improvement: true` is set in the Shift Configuration section of `manager.md`. The manager SHALL use `qsv` CLI commands for all CSV operations on `table.csv`. The manager SHALL process all remaining items autonomously within a single session, returning to the supervisor only when all work is complete.
+The system SHALL define a `manager` subagent (distributed at `plugins/nightshift/agents/manager.md`) that orchestrates shift execution. The manager SHALL read `manager.md`, `table.csv`, and the shift's `.env` file (if present), determine which items need processing, resolve per-task execution-config fields (`model`, `working_dir`, `worktree`) using item data and shift metadata, and dispatch work to dev subprocesses via the Bash tool (`${CLAUDE_SKILL_DIR}/scripts/dispatch-batch.sh`). The manager SHALL be responsible for applying step improvements to task files based on dev subprocess recommendations, unless `disable-self-improvement: true` is set in the Shift Configuration section of `manager.md`. The manager SHALL use `qsv` CLI commands for all CSV operations on `table.csv`. The manager SHALL process all remaining items autonomously within a single session, returning to the supervisor only when all work is complete.
 
 #### Scenario: Manager reads shift state
 - **WHEN** the manager agent is invoked for a shift
@@ -206,55 +206,48 @@ The dev agent's result format returned to the manager SHALL include only the fie
 - **WHEN** the dev agent returns results to the manager
 - **THEN** the results SHALL NOT include `Steps`, `Captured Values`, `Self-Validation`, or `Attempts` sections
 
-### Requirement: Manager agent qsv and flock bash permissions
-The manager subagent SHALL declare its `tools` such that `Bash(qsv *)`, `Bash(flock *)`, and `Bash(claude *)` are pre-approved. The `Bash(claude *)` allow is required so the manager can spawn dev subprocesses without permission prompts.
+### Requirement: Manager agent file location and naming
+The system SHALL ship the Nightshift manager subagent as `plugins/nightshift/agents/manager.md`. The legacy `nightshift-manager.md` filename and the legacy `templates/claude/agents/` path SHALL NOT be used. The agent's name field in its YAML frontmatter SHALL be `manager` (namespacing is provided by the plugin, not the filename). The dev role SHALL NOT have a corresponding subagent file; dev work runs as a top-level subprocess of the `nightshift:do-task` skill (see the `dev-subprocess` capability).
 
-#### Scenario: Manager can execute flock-prefixed qsv commands
-- **WHEN** the manager agent needs to read `table.csv`
-- **THEN** it SHALL execute `flock -x <table_path> qsv` subcommands via the Bash tool without permission denial
+#### Scenario: Manager agent lives in the plugin directory
+- **WHEN** the repository is inspected
+- **THEN** `plugins/nightshift/agents/manager.md` SHALL exist with a `name: manager` frontmatter field, and `plugins/nightshift/agents/nightshift-manager.md` SHALL NOT exist
 
-#### Scenario: Manager can execute claude CLI subprocesses
-- **WHEN** the manager needs to dispatch dev work
-- **THEN** it SHALL execute `claude -p ...` (directly or via `dispatch-batch.sh`) via the Bash tool without permission denial
-
-#### Scenario: Manager cannot execute non-allowed bash commands
-- **WHEN** the manager agent attempts to run a bash command that does not match the `qsv*`, `flock*`, or `claude*` patterns
-- **THEN** the command SHALL be denied by the permission policy
-
-### Requirement: Claude Code subagent surface
-The system SHALL provide one Claude Code subagent definition: `nightshift-manager`, at `.claude/agents/nightshift-manager.md`. The dev role SHALL NOT have a corresponding subagent file; dev work runs as a top-level subprocess of the `nightshift-do-task` skill (see the `dev-subprocess` capability).
-
-#### Scenario: Manager subagent file exists after install
-- **WHEN** `nightshift init` completes successfully
-- **THEN** `.claude/agents/nightshift-manager.md` SHALL exist with valid Claude Code subagent frontmatter (at minimum `name`, `description`, `tools`, `model`)
+#### Scenario: Manager is invokable after plugin install
+- **WHEN** a user has installed the plugin and runs `/nightshift:start <shift>`
+- **THEN** Claude Code SHALL be able to fork into the manager subagent from the start skill (`context: fork`, `agent: manager` in the skill frontmatter)
 
 #### Scenario: No nightshift-dev subagent file
-- **WHEN** `nightshift init` completes successfully
-- **THEN** `.claude/agents/nightshift-dev.md` SHALL NOT exist; if a pre-existing file from a prior installation is detected, `nightshift init` SHALL remove or rename it (see the installer spec for cleanup behavior)
+- **WHEN** the plugin is inspected
+- **THEN** `plugins/nightshift/agents/nightshift-dev.md` SHALL NOT exist
 
-### Requirement: Manager subagent restricts spawnable subagents to dev
-The Claude `nightshift-manager` subagent SHALL declare `tools` such that the `Agent` tool is NOT present — the manager cannot spawn any subagent. Delegation to dev work occurs via the Bash tool spawning `claude -p` subprocesses, not via Agent.
+### Requirement: Manager declares required tools
+The manager agent's YAML frontmatter SHALL declare every system command it needs via `allowed-tools`, including `Bash(qsv *)`, `Bash(flock *)`, `Bash(claude *)`, and `Bash(jq *)`. The plugin SHALL NOT rely on a runtime merge into `~/.claude/settings.json` to grant these. The frontmatter SHALL also declare the `tools` it can call (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`) and SHALL NOT include the `Agent` tool — delegation to dev work occurs via Bash spawning `claude -p` subprocesses, not via Agent.
+
+#### Scenario: Manager has the needed allow entries in frontmatter
+- **WHEN** `plugins/nightshift/agents/manager.md` is inspected
+- **THEN** its `allowed-tools` frontmatter SHALL include `Bash(qsv *)`, `Bash(flock *)`, `Bash(claude *)`, and `Bash(jq *)`
 
 #### Scenario: Manager tools omit Agent
-- **WHEN** `.claude/agents/nightshift-manager.md` is parsed
+- **WHEN** `plugins/nightshift/agents/manager.md` is parsed
 - **THEN** its `tools` field SHALL NOT include `Agent`, `Agent(*)`, or any `Agent(<name>)` entry
 
 #### Scenario: Manager has the tools required for orchestration
-- **WHEN** `.claude/agents/nightshift-manager.md` is parsed
+- **WHEN** `plugins/nightshift/agents/manager.md` is parsed
 - **THEN** its `tools` field SHALL include `Read`, `Write`, `Edit`, `Bash`, `Glob`, and `Grep` so the manager can read configuration, write task files, edit state files, run qsv/flock commands, and spawn dev subprocesses via `claude -p`
 
-### Requirement: Manager subagent body fits Claude Code re-attach budget
-The system SHALL keep the prose body (frontmatter excluded) of `.claude/agents/nightshift-manager.md` under 5,000 tokens so that the manager's instructions survive Claude Code's auto-compaction event during long shifts. The build or test process SHALL verify this constraint.
+### Requirement: Manager body is under budget
+The manager agent's body content (excluding frontmatter) SHALL remain under 20000 characters for prompt-budget reasons.
 
-#### Scenario: Manager body within budget
-- **WHEN** the Claude target template `templates/claude/agents/nightshift-manager.md` is built and tested
-- **THEN** the body content (everything after the closing `---` of the frontmatter) SHALL measure under 5,000 tokens (estimated as fewer than 20,000 characters as a conservative proxy)
+#### Scenario: Manager body length is bounded
+- **WHEN** the body of `plugins/nightshift/agents/manager.md` is measured (post-frontmatter)
+- **THEN** its length SHALL be less than 20000 characters
 
 ### Requirement: Subagent model defaults
-The system SHALL default the Claude `nightshift-manager` subagent to `model: sonnet` for orchestration intelligence. The dev role no longer has a subagent and therefore no model default — the dev subprocess uses whatever model the user has configured for top-level Claude Code (or whatever the manager passes via `--model` when invoking `claude -p`).
+The system SHALL default the `manager` subagent to `model: sonnet` for orchestration intelligence. The dev role no longer has a subagent and therefore no model default — the dev subprocess uses whatever model the user has configured for top-level Claude Code (or whatever the manager passes via `--model` when invoking `claude -p`).
 
 #### Scenario: Manager defaults to sonnet
-- **WHEN** `.claude/agents/nightshift-manager.md` is parsed
+- **WHEN** `plugins/nightshift/agents/manager.md` is parsed
 - **THEN** its `model` frontmatter field SHALL be `sonnet`
 
 #### Scenario: Dev subprocess uses inherited or manager-specified model

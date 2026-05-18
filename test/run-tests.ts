@@ -6,11 +6,14 @@
  * Executes integration tests against Claude Code.
  *
  * Test execution order:
- *   1. init
- *   2. nightshift-start
- *   3. nightshift-start-parallel
- *   4. nightshift-start-no-self-improvement
- *   5. nightshift-start-parallel-no-self-improvement
+ *   1. nightshift-start
+ *   2. nightshift-start-parallel
+ *   3. nightshift-start-no-self-improvement
+ *   4. nightshift-start-parallel-no-self-improvement
+ *
+ * The plugin under test is loaded via `claude --plugin-dir ./plugins/nightshift`
+ * for each shift run; there is no separate install step in the new
+ * plugin-marketplace distribution model.
  *
  * Requires the `claude` CLI on PATH; exits with an error if missing.
  *
@@ -184,6 +187,8 @@ function runCommand(
  * background tasks forced synchronous (so `context: fork` skills block the
  * print-mode session until the manager subagent completes).
  */
+const PLUGIN_DIR = join(PROJECT_ROOT, "plugins", "nightshift");
+
 function runShiftCommand(
   commandName: string,
   shiftName: string,
@@ -192,7 +197,9 @@ function runShiftCommand(
     "claude",
     [
       "-p",
-      `/${commandName} ${shiftName}`,
+      `/nightshift:${commandName} ${shiftName}`,
+      "--plugin-dir",
+      PLUGIN_DIR,
       "--output-format",
       "json",
       "--dangerously-skip-permissions",
@@ -495,16 +502,14 @@ function setupShift(opts: {
   }
 }
 
-function ensureInit(): void {
-  const claudeReady = existsSync(join(WORKSPACE_DIR, ".claude", "skills"));
-  if (!claudeReady) {
-    execSync("pnpm build", { cwd: PROJECT_ROOT, stdio: "pipe" });
-    const binPath = join(PROJECT_ROOT, "bin", "nightshift.js");
-    execSync(`node ${binPath} init`, {
-      cwd: WORKSPACE_DIR,
-      stdio: "pipe",
-    });
-  }
+function ensureWorkspaceBootstrap(): void {
+  // In the plugin-marketplace model, the plugin's runtime files are loaded by
+  // Claude Code via --plugin-dir at session start; we do not scaffold anything
+  // into the workspace. We only ensure the project-layer bootstrap exists
+  // (the .nightshift/archive/ + .nightshift/.gitignore that /nightshift:create
+  // would normally create on first run). For tests that pre-seed a shift
+  // directory, we create the parent scaffold ourselves.
+  mkdirSync(join(WORKSPACE_DIR, ".nightshift", "archive"), { recursive: true });
 }
 
 function cleanShift(): void {
@@ -529,125 +534,66 @@ const SHIFT_OUTPUT_CHECKS = (): Check[] => {
 };
 
 const tests: TestDefinition[] = [
-  // -- 1. Init test --
-  {
-    name: "init",
-    run: async () => {
-      for (const subdir of [".claude", ".nightshift"]) {
-        const p = join(WORKSPACE_DIR, subdir);
-        if (existsSync(p)) rmSync(p, { recursive: true });
-      }
-      const claudeMd = join(WORKSPACE_DIR, "CLAUDE.md");
-      if (existsSync(claudeMd)) rmSync(claudeMd);
-
-      execSync("pnpm build", { cwd: PROJECT_ROOT, stdio: "pipe" });
-      const binPath = join(PROJECT_ROOT, "bin", "nightshift.js");
-      await runCommand("node", [binPath, "init"], { cwd: WORKSPACE_DIR });
-    },
-    checks: () => [
-      { label: ".nightshift/archive/ dir", type: "dir", path: ".nightshift/archive" },
-      {
-        label: ".nightshift/.gitignore exists",
-        type: "file",
-        path: ".nightshift/.gitignore",
-      },
-      {
-        label: ".nightshift/.gitignore contains table.csv.bak",
-        type: "content",
-        path: ".nightshift/.gitignore",
-        contains: "table.csv.bak",
-      },
-      { label: ".claude/agents/ dir", type: "dir", path: ".claude/agents" },
-      { label: ".claude/skills/ dir", type: "dir", path: ".claude/skills" },
-      {
-        label: "claude manager",
-        type: "file",
-        path: ".claude/agents/nightshift-manager.md",
-      },
-      {
-        label: "claude start skill",
-        type: "file",
-        path: ".claude/skills/nightshift-start/SKILL.md",
-      },
-      {
-        label: "claude do-task skill",
-        type: "file",
-        path: ".claude/skills/nightshift-do-task/SKILL.md",
-      },
-      {
-        label: "dispatch-batch helper",
-        type: "file",
-        path: ".claude/skills/nightshift-start/scripts/dispatch-batch.sh",
-      },
-      {
-        label: ".claude/settings.json exists",
-        type: "file",
-        path: ".claude/settings.json",
-      },
-      { label: "CLAUDE.md exists", type: "file", path: "CLAUDE.md" },
-    ],
-  },
-
-  // -- 2. nightshift-start (sequential) --
+  // -- 1. nightshift:start (sequential) --
   {
     name: "nightshift-start",
     run: async () => {
-      ensureInit();
+      ensureWorkspaceBootstrap();
       cleanShift();
       setupShift({
         manager: FIXTURE_MANAGER_WITH_TASK,
         table: FIXTURE_TABLE_WITH_DATA,
         taskFile: { name: FIXTURE_TASK_NAME, content: FIXTURE_TASK_FILE },
       });
-      await runShiftCommand("nightshift-start", TEST_SHIFT_NAME);
+      await runShiftCommand("start", TEST_SHIFT_NAME);
     },
     checks: SHIFT_OUTPUT_CHECKS,
   },
 
-  // -- 3. nightshift-start-parallel --
+  // -- 2. nightshift:start (parallel) --
   {
     name: "nightshift-start-parallel",
     run: async () => {
-      ensureInit();
+      ensureWorkspaceBootstrap();
       cleanShift();
       setupShift({
         manager: FIXTURE_MANAGER_PARALLEL,
         table: FIXTURE_TABLE_WITH_DATA,
         taskFile: { name: FIXTURE_TASK_NAME, content: FIXTURE_TASK_FILE },
       });
-      await runShiftCommand("nightshift-start", TEST_SHIFT_NAME);
+      await runShiftCommand("start", TEST_SHIFT_NAME);
     },
     checks: SHIFT_OUTPUT_CHECKS,
   },
 
-  // -- 4. nightshift-start-no-self-improvement --
+  // -- 3. nightshift:start (no self-improvement) --
   {
     name: "nightshift-start-no-self-improvement",
     run: async () => {
-      ensureInit();
+      ensureWorkspaceBootstrap();
       cleanShift();
       setupShift({
         manager: FIXTURE_MANAGER_NO_SELF_IMPROVEMENT,
         table: FIXTURE_TABLE_WITH_DATA,
         taskFile: { name: FIXTURE_TASK_NAME, content: FIXTURE_TASK_FILE },
       });
-      await runShiftCommand("nightshift-start", TEST_SHIFT_NAME);
+      await runShiftCommand("start", TEST_SHIFT_NAME);
     },
     checks: SHIFT_OUTPUT_CHECKS,
   },
 
-  // -- 5. nightshift-start-parallel-no-self-improvement --
+  // -- 4. nightshift:start (parallel, no self-improvement) --
   {
     name: "nightshift-start-parallel-no-self-improvement",
     run: async () => {
-      ensureInit();
+      ensureWorkspaceBootstrap();
       cleanShift();
       setupShift({
         manager: FIXTURE_MANAGER_PARALLEL_NO_SELF_IMPROVEMENT,
         table: FIXTURE_TABLE_WITH_DATA,
         taskFile: { name: FIXTURE_TASK_NAME, content: FIXTURE_TASK_FILE },
       });
-      await runShiftCommand("nightshift-start", TEST_SHIFT_NAME);
+      await runShiftCommand("start", TEST_SHIFT_NAME);
     },
     checks: SHIFT_OUTPUT_CHECKS,
   },

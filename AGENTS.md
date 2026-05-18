@@ -2,10 +2,11 @@
 
 ## Project Overview
 
-This is an AI agent orchestration framework called **Nightshift** — a batch processing system where a manager subagent dispatches dev work as fresh top-level `claude -p` subprocesses. Each dev subprocess inherits the user's full top-level MCP configuration. The framework is distributed as a TypeScript CLI installer (`nightshift init`) plus Markdown templates that define agent behavior, skills, specifications, and workflows.
+This is an AI agent orchestration framework called **Nightshift** — a batch processing system where a manager subagent dispatches dev work as fresh top-level `claude -p` subprocesses. Each dev subprocess inherits the user's full top-level MCP configuration. Nightshift is distributed as a [Claude Code plugin](https://code.claude.com/docs/en/plugins) via its own marketplace; the repository doubles as the marketplace catalog and the plugin source.
 
-**Runtime:** [Claude Code](https://code.claude.com/) v2.1.83+ — Nightshift ships a Claude Code subagent (manager only) and several Skills (including the internal `nightshift-do-task` skill that dev subprocesses invoke). The CLI installer (`nightshift init`) writes them into the project.
-**Package manager:** pnpm.
+**Runtime:** [Claude Code](https://code.claude.com/) v2.1.83+ — Nightshift ships a Claude Code subagent (manager only) and eight skills (including the internal `/nightshift:do-task` skill that dev subprocesses invoke). The plugin is installed via `/plugin install nightshift@nightshift`.
+**Distribution:** Claude Code plugin marketplace. The legacy npm package (`@johndaskovsky/nightshift`) survives as a deprecation shim — `nightshift init` only prints migration instructions.
+**Package manager:** pnpm (for the npm deprecation shim's TypeScript build).
 **Spec framework:** OpenSpec (spec-driven development workflow).
 
 ## Build / Lint / Test Commands
@@ -22,40 +23,37 @@ pnpm install
 pnpm run build
 ```
 
+Compiles the deprecation-stub CLI to `dist/` and syncs the plugin manifest version with `package.json`. No plugin-asset materialization happens — the plugin lives in its canonical location at `plugins/nightshift/`.
+
 ### Tests
 
 ```bash
-pnpm test               # init suite + integration suite
-pnpm test:init          # fast scaffolder/init suite (no runtime CLI required)
 pnpm test:integration   # integration suite (requires `claude` on PATH)
 ```
 
-The init suite (`test/init-tests.ts`) exercises scaffolder behavior — directory layout, settings.json merge, CLAUDE.md merge — without launching Claude Code.
+The integration suite (`test/run-tests.ts`) drives shift execution under Claude Code by loading the plugin via `claude --plugin-dir ./plugins/nightshift`. It exits with an error if the `claude` CLI is not on PATH.
 
-The integration suite (`test/run-tests.ts`) drives shift execution under Claude Code. It exits with an error if the `claude` CLI is not on PATH.
-
-### Shift commands (run inside Claude Code)
+### Shift commands (run inside Claude Code, after `/plugin install nightshift@nightshift`)
 
 | Command | Purpose |
 |---------|---------|
-| `/nightshift-create <name>` | Scaffold a new shift (manager.md + table.csv) |
-| `/nightshift-add-task <name>` | Add a task to an existing shift |
-| `/nightshift-update-table <name>` | Bulk modify table data |
-| `/nightshift-start <name>` | Begin or resume shift execution |
-| `/nightshift-test-task <name>` | Test a single task on one item (no state changes) |
-| `/nightshift-archive <name>` | Archive a completed shift |
+| `/nightshift:create <name>` | Scaffold a new shift (manager.md + table.csv); idempotently bootstrap project layer on first run |
+| `/nightshift:add-task <name>` | Add a task to an existing shift |
+| `/nightshift:update-table <name>` | Bulk modify table data |
+| `/nightshift:start <name>` | Begin or resume shift execution |
+| `/nightshift:test-task <name>` | Test a single task on one item (no state changes) |
+| `/nightshift:archive <name>` | Archive a completed shift |
+| `/nightshift:doctor` | Verify system dependencies (`qsv`, `flock`, `jq`) |
 
-In Claude Code, all six commands are skills with `disable-model-invocation: true` — Claude does not auto-invoke them, you type `/<name>` explicitly.
+All skills have `disable-model-invocation: true` — Claude does not auto-invoke them, you type `/nightshift:<name>` explicitly.
 
 ### Testing a single task
 
-The closest equivalent to "running a single test" is:
-
 ```
-/nightshift-test-task <shift-name>
+/nightshift:test-task <shift-name>
 ```
 
-This prompts you to select a task and item, invokes the dev agent, and displays results **without modifying `table.csv`**.
+Prompts you to select a task and item, invokes the dev agent, displays results **without modifying `table.csv`**.
 
 ### OpenSpec validation
 
@@ -68,48 +66,58 @@ openspec list changes
 ## Repository Structure
 
 ```
-night-shift/
-├── src/                            # TypeScript CLI source
-│   ├── cli/                        # CLI commands (init)
-│   ├── core/                       # Core utilities
-│   └── index.ts                    # Entry point
-├── bin/                            # CLI entry script
-│   └── nightshift.js
+nightshift/
+├── .claude-plugin/
+│   └── marketplace.json            # marketplace catalog (lists 1 plugin)
+├── plugins/
+│   └── nightshift/                 # the plugin itself
+│       ├── .claude-plugin/
+│       │   └── plugin.json         # plugin manifest
+│       ├── agents/
+│       │   └── manager.md          # manager subagent
+│       └── skills/
+│           ├── start/SKILL.md (+ scripts/)
+│           ├── create/SKILL.md (+ scripts/)
+│           ├── add-task/SKILL.md
+│           ├── update-table/SKILL.md
+│           ├── do-task/SKILL.md
+│           ├── test-task/SKILL.md
+│           ├── archive/SKILL.md (+ scripts/)
+│           └── doctor/SKILL.md
+├── src/                            # TypeScript source for the deprecation-stub CLI
+│   ├── cli/
+│   └── index.ts
+├── bin/
+│   └── nightshift.js               # CLI entry script
 ├── dist/                           # Compiled output (generated by build)
-├── templates/                      # Scaffolded into target projects
-│   └── claude/
-│       ├── agents/                 # 1 Claude Code subagent (manager only)
-│       ├── skills/                 # 6 Claude Code skill directories
-│       │   └── nightshift-*/SKILL.md (+ scripts/)
-│       ├── CLAUDE.md               # CLAUDE.md template fragment (marker-merged)
-│       └── settings.json           # .claude/settings.json fragment
-├── .claude-plugin/                 # Claude Code Plugin manifest
-├── agents/                         # (build output) plugin-bundled subagents
-├── skills/                         # (build output) plugin-bundled skills
-├── test/                           # Integration tests
-│   └── run-tests.ts                # Test runner (init, start, start-parallel)
+├── test/
+│   └── run-tests.ts                # Integration tests (drives the plugin via --plugin-dir)
 ├── openspec/                       # Specification artifacts
-│   ├── config.yaml                 # OpenSpec schema config
-│   ├── project.md                  # Project context and conventions
+│   ├── config.yaml
+│   ├── project.md
 │   ├── specs/                      # Authoritative specifications
 │   └── changes/                    # Change tracking and archive
-├── package.json                    # pnpm project config
-├── build.js                        # Build script
-├── tsconfig.json                   # TypeScript config
+├── package.json
+├── build.js                        # Build script (TypeScript compile + plugin-manifest version sync)
+├── tsconfig.json
 ├── AGENTS.md                       # Agent context (loaded every conversation)
 └── README.md                       # User-facing documentation
 ```
 
 ## Architecture
 
-### Per-task execution config (3.1.0+)
+### Per-task execution config
 
 The task `## Configuration` section supports three optional fields beyond `tools:`: `model:` (which Claude Code model to invoke), `working_dir:` (per-item directory, can reference a `table.csv` column via `{column}` placeholders), and `worktree: true` (run each dev subprocess in a fresh git worktree of the target dir). Enables multi-repo shifts. See README "Multi-repo shifts".
 
 ### Manager subagent + per-item dev subprocesses
 
-- **Manager** (`nightshift-manager` subagent): Sole orchestrator. Reads state, dispatches dev work via `${CLAUDE_SKILL_DIR}/scripts/dispatch-batch.sh` (which spawns `claude -p` subprocesses of the `/nightshift-do-task` skill), writes `manager.md` and task files. Reads `table.csv` for status information but does not write status transitions. Applies step improvements only from successful dev results. Never executes task steps directly. Has no `Agent` tool — cannot delegate to other subagents.
-- **Dev** (a fresh `claude -p` subprocess per item, running the `/nightshift-do-task` skill): Executor. Follows task steps, self-validates, retries up to 3 attempts, reports step improvement recommendations in a structured JSON result event. Writes its own status to `table.csv` (`done` on success, `failed` on failure) via `flock -x` qsv. Inherits the user's full top-level MCP configuration — Slack, Drive, Playwright, internal MCPs, anything globally installed. Cannot delegate (no Agent tool).
+- **Manager** (`manager` subagent, at `plugins/nightshift/agents/manager.md`): Sole orchestrator. Reads state, dispatches dev work via `${CLAUDE_PLUGIN_ROOT}/skills/start/scripts/dispatch-batch.sh` (which spawns `claude -p` subprocesses invoking `/nightshift:do-task`), writes `manager.md` and task files. Reads `table.csv` for status information but does not write status transitions. Applies step improvements only from successful dev results. Never executes task steps directly. Has no `Agent` tool — cannot delegate to other subagents.
+- **Dev** (a fresh `claude -p` subprocess per item, running `/nightshift:do-task`): Executor. Follows task steps, self-validates, retries up to 3 attempts, reports step improvement recommendations in a structured JSON result event. Writes its own status to `table.csv` (`done` on success, `failed` on failure) via `flock -x` qsv. Inherits the user's full top-level MCP configuration — Slack, Drive, Playwright, internal MCPs, anything globally installed. Cannot delegate (no Agent tool).
+
+### Project bootstrap
+
+`/nightshift:create` performs idempotent project-layer bootstrap on every invocation: ensures `.nightshift/archive/` exists and creates `.nightshift/.gitignore` with default ignore patterns if absent. This work used to live in `nightshift init`; it moves into the create skill so that a fresh project never needs a separate init step.
 
 ### Item state machine
 
@@ -134,10 +142,10 @@ Status values use snake_case: `todo`, `done`, `failed`.
 
 ### File and directory naming
 
-- **kebab-case** for files and directories: `nightshift-dev.md`, `nightshift-commands/`
+- **kebab-case** for files and directories: `manager.md`, `nightshift-commands/` (spec capabilities)
 - **snake_case** for task names: `create_page`, `update_spreadsheet` (task names become CSV column names; hyphens conflict with qsv selectors)
 - **Date-prefixed** for archived changes: `2026-02-08-add-nightshift-framework/`
-- **Verb-led prefixes** for change IDs: `add-`, `update-`, `remove-`, `refactor-`
+- **Verb-led prefixes** for change IDs: `add-`, `update-`, `remove-`, `refactor-`, `migrate-`
 
 ### Markdown conventions
 
@@ -200,11 +208,9 @@ The system SHALL <normative statement>.
 
 ## Permissions Reference
 
-Project-scoped permissions are written to `.claude/settings.json` by `nightshift init` (merged with any user-authored content):
+The plugin's skills and agent declare their required Bash patterns via `allowed-tools` frontmatter. There is no automatic merge into `~/.claude/settings.json`. If Claude Code does not honor the declared tools and prompts for `Bash(qsv *)` etc., the user adds them once to `~/.claude/settings.json` (the README covers this).
 
 | Agent | write | edit | bash | task delegation | playwright / other MCPs |
 |-------|-------|------|------|-----------------|--------------------------|
-| Manager (subagent) | yes | yes | `qsv*`, `flock*`, `claude*` | none (spawns subprocesses, not subagents) | none in-session (manager doesn't call MCPs) |
-| Dev (subprocess) | yes | yes | `mkdir*`, `qsv*`, `flock*` (plus whatever the task's `tools:` line declares) | none | all user-level MCPs inherited automatically |
-
-Per-skill `allowed-tools` frontmatter pre-approves `Bash(qsv *)` and `Bash(flock *)` for the skills that perform CSV operations.
+| Manager (subagent) | yes | yes | unrestricted (declared at `tools: Bash`) | none (spawns subprocesses, not subagents) | none in-session (manager doesn't call MCPs) |
+| Dev (subprocess) | yes | yes | per-skill `allowed-tools` (typically `qsv*`, `flock*`, plus whatever the task's `tools:` line declares) | none | all user-level MCPs inherited automatically |

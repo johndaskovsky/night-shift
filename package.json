@@ -1,12 +1,13 @@
 {
   "name": "@johndaskovsky/nightshift",
-  "version": "3.1.0",
-  "description": "CLI installer for the Nightshift AI agent orchestration framework",
+  "version": "4.0.0",
+  "description": "Deprecation shim for the Nightshift CLI. Nightshift is now distributed as a Claude Code plugin — install via /plugin marketplace add johndaskovsky/nightshift.",
   "keywords": [
     "nightshift",
     "claude-code",
     "ai-agents",
-    "cli"
+    "plugin",
+    "deprecated"
   ],
   "homepage": "https://github.com/johndaskovsky/nightshift#readme",
   "bugs": {
@@ -21,23 +22,16 @@
   },
   "files": [
     "bin/",
-    "dist/",
-    "templates/",
-    ".claude-plugin/",
-    "agents/",
-    "skills/"
+    "dist/"
   ],
   "scripts": {
     "build": "node build.js",
-    "test": "tsx test/init-tests.ts && tsx test/run-tests.ts",
-    "test:init": "tsx test/init-tests.ts",
+    "test": "tsx test/run-tests.ts",
     "test:integration": "tsx test/run-tests.ts",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "chalk": "^5.3.0",
-    "commander": "^12.1.0",
-    "ora": "^8.1.0"
+    "commander": "^12.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",

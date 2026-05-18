@@ -1,0 +1,18 @@
+{
+  "name": "nightshift",
+  "version": "4.0.0",
+  "description": "Long-running unsupervised batch agent framework for Claude Code",
+  "author": {
+    "name": "johndaskovsky"
+  },
+  "homepage": "https://github.com/johndaskovsky/nightshift",
+  "repository": "https://github.com/johndaskovsky/nightshift",
+  "license": "MIT",
+  "keywords": [
+    "nightshift",
+    "batch",
+    "agent",
+    "automation",
+    "unattended"
+  ]
+}

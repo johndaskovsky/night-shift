@@ -1,0 +1,19 @@
+{
+  "name": "nightshift",
+  "owner": {
+    "name": "johndaskovsky"
+  },
+  "description": "Nightshift: a long-running unsupervised batch agent framework for Claude Code.",
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "nightshift",
+      "source": "nightshift",
+      "description": "Long-running unsupervised batch agent framework — define a CSV table of items and task definitions, then let a manager-plus-dev system process them autonomously.",
+      "category": "automation",
+      "tags": ["batch", "agent", "unattended", "automation"]
+    }
+  ]
+}

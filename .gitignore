@@ -4,10 +4,6 @@
 # Nightshift shift environment files (secrets)
 .nightshift/**/.env
 
-# Nightshift CLI build output
+# Build output (TypeScript compile of the deprecation-stub CLI)
 /dist
 /node_modules
-
-# Claude Code Plugin artifacts (materialized from templates/claude/ at build time)
-/agents
-/skills

@@ -14,7 +14,7 @@ Long-running unsupervised agent framework
 
 A batch processing framework for AI agents. Define a table of items, write task instructions, and let a manager-plus-dev system work through them autonomously with built-in retries, self-improvement, and self-validation.
 
-Nightshift runs inside [Claude Code](https://code.claude.com/) as a `nightshift-manager` subagent that dispatches dev work as fresh top-level `claude -p` subprocesses. **Dev subprocesses inherit your full user-level MCP configuration** — any MCP you've installed in Claude Code (Slack, Drive, Playwright, internal company MCPs) is automatically available to every Nightshift task. It's distributed as a TypeScript CLI installer (`nightshift init`) and as a Claude Code Plugin for native plugin discovery.
+Nightshift runs inside [Claude Code](https://code.claude.com/) as a `manager` subagent that dispatches dev work as fresh top-level `claude -p` subprocesses. **Dev subprocesses inherit your full user-level MCP configuration** — any MCP you've installed in Claude Code (Slack, Drive, Playwright, internal company MCPs) is automatically available to every Nightshift task. Nightshift is distributed as a [Claude Code plugin](https://code.claude.com/docs/en/plugins) via its own marketplace.
 
 ## How It Works
 
@@ -40,32 +40,48 @@ todo --> done
 
 ## Installation
 
-Install the Nightshift CLI globally:
+Inside Claude Code, add the marketplace and install the plugin:
 
-```bash
-npm install -g @johndaskovsky/nightshift
+```
+/plugin marketplace add johndaskovsky/nightshift
+/plugin install nightshift@nightshift
 ```
 
-Then initialize Nightshift in your project:
+After install, restart Claude Code if it's already running (so the new skills are discovered), then verify your system has the required dependencies:
 
-```bash
-cd your-project
-nightshift init
+```
+/nightshift:doctor
 ```
 
-The CLI scaffolds `.claude/agents/`, `.claude/skills/`, `.claude/settings.json` (merged), and a project `CLAUDE.md` (merged via `<!-- nightshift:start -->` / `<!-- nightshift:end -->` markers), alongside the `.nightshift/` shift data directory.
+The doctor skill checks for `qsv`, `flock`, and `jq` on PATH. It prints `brew install` hints for any that are missing.
 
-To regenerate framework files after upgrading the CLI, run `nightshift init` again. It detects the existing installation and adjusts its output messaging accordingly. All framework-managed files are overwritten with the latest versions; shift data in `.nightshift/` is never touched.
+You're ready when `/nightshift:doctor` reports all three present. Move on to [Quick Start](#quick-start).
 
-### Alternative: Claude Code Plugin
+### Permissions
 
-The npm package also publishes a Claude Code Plugin manifest. If you prefer plugin-style distribution over the CLI installer, you can install Nightshift via Claude Code's plugin discovery (no `nightshift init` step needed). The plugin bundles the same subagent and skill files; project-scoped installs from `nightshift init` will override plugin-supplied files per [Claude Code's precedence rules](https://code.claude.com/docs/en/skills#where-skills-live).
+Nightshift's skills declare the Bash commands they need (`qsv`, `flock`, `claude`, `jq`) via `allowed-tools` frontmatter. Claude Code should honor these declarations automatically. If you see repeated permission prompts during a shift, add the entries to `~/.claude/settings.json` once:
 
-> ⚠️ Don't run both at once: if you install Nightshift as a plugin **and** also run `nightshift init` in the same project, you'll have two copies of the skills. The CLI prints a warning when it detects a likely Nightshift plugin reference in `~/.claude/settings.json`.
+```json
+{
+  "permissions": {
+    "allow": ["Bash(qsv *)", "Bash(flock *)", "Bash(claude *)", "Bash(jq *)"]
+  }
+}
+```
 
-### First-run note for Claude Code users
+### Updates
 
-Claude Code watches skill directories for changes during a session, but creating a top-level `.claude/skills/` directory that did not exist when the session started requires restarting Claude Code. If you ran `nightshift init` while Claude Code was already running, restart it so the new skills are discovered.
+Marketplaces auto-update on Claude Code startup. To pull the latest plugin version manually:
+
+```
+/plugin marketplace update
+```
+
+### Deprecated: npm CLI
+
+Earlier Nightshift versions (1.x–3.x) shipped as the npm package `@johndaskovsky/nightshift` with a `nightshift init` command. **This path is deprecated as of 4.0.0.** The npm package still exists but `nightshift init` only prints these instructions and exits. Migrate to the plugin install path above.
+
+If you have a previous project-local install (`<project>/.claude/skills/nightshift-*/`), it will shadow the plugin via Claude Code's skill precedence. Delete those directories from your projects to let the plugin take over. Your `.nightshift/<shift>/` data is unaffected.
 
 ## Quick Start
 
@@ -74,7 +90,7 @@ All commands run inside Claude Code.
 ### 1. Create a shift
 
 ```
-/nightshift-create my-batch-job
+/nightshift:create my-batch-job
 ```
 
 This scaffolds `.nightshift/my-batch-job/` with a `manager.md` and an empty `table.csv`. Add data to the table. The items should have all of the metadata needed to process the tasks.
@@ -82,7 +98,7 @@ This scaffolds `.nightshift/my-batch-job/` with a `manager.md` and an empty `tab
 ### 2. Add a task
 
 ```
-/nightshift-add-task my-batch-job
+/nightshift:add-task my-batch-job
 ```
 
 The command asks you to describe what the agent should do, what tools it needs, step-by-step instructions, and how to verify success. It creates a task file (e.g., `create_page.md`) with three sections:
@@ -117,7 +133,7 @@ See [Template Variables](#template-variables) for details.
 ### 3. Add items to the table
 
 ```
-/nightshift-update-table my-batch-job
+/nightshift:update-table my-batch-job
 ```
 
 Add rows with the metadata columns your tasks reference. The resulting `table.csv` looks like:
@@ -134,7 +150,7 @@ Each task gets a status column initialized to `todo`.
 ### 4. Run the shift
 
 ```
-/nightshift-start my-batch-job
+/nightshift:start my-batch-job
 ```
 
 The manager agent takes over: it reads the table, picks the next `todo` item, delegates to the dev agent, updates statuses, and loops until everything is `done` or `failed`.
@@ -142,7 +158,7 @@ The manager agent takes over: it reads the table, picks the next `todo` item, de
 ### 5. Test a single task (optional)
 
 ```
-/nightshift-test-task my-batch-job
+/nightshift:test-task my-batch-job
 ```
 
 Runs one task on one item through the dev agent **without modifying any state**. Useful for debugging task definitions before running a full shift.
@@ -150,7 +166,7 @@ Runs one task on one item through the dev agent **without modifying any state**.
 ### 6. Archive a completed shift
 
 ```
-/nightshift-archive my-batch-job
+/nightshift:archive my-batch-job
 ```
 
 Moves the shift to `.nightshift/archive/YYYY-MM-DD-my-batch-job/`.
@@ -159,12 +175,12 @@ Moves the shift to `.nightshift/archive/YYYY-MM-DD-my-batch-job/`.
 
 | Command | Purpose |
 |---------|---------|
-| `/nightshift-create <name>` | Scaffold a new shift directory with manager.md and table.csv |
-| `/nightshift-add-task <name>` | Add a task definition to an existing shift |
-| `/nightshift-update-table <name>` | Add rows, update metadata, or reset failed items |
-| `/nightshift-start <name>` | Begin or resume shift execution |
-| `/nightshift-test-task <name>` | Dry-run a single task on a single item |
-| `/nightshift-archive <name>` | Move a completed shift to the archive |
+| `/nightshift:create <name>` | Scaffold a new shift directory with manager.md and table.csv |
+| `/nightshift:add-task <name>` | Add a task definition to an existing shift |
+| `/nightshift:update-table <name>` | Add rows, update metadata, or reset failed items |
+| `/nightshift:start <name>` | Begin or resume shift execution |
+| `/nightshift:test-task <name>` | Dry-run a single task on a single item |
+| `/nightshift:archive <name>` | Move a completed shift to the archive |
 
 All commands accept a shift name as an argument, or prompt interactively if omitted.
 
@@ -252,7 +268,7 @@ The dev agent validates its own work against the task's Validation criteria afte
 
 ### Resumability
 
-If a shift is interrupted, `/nightshift-start` picks up where it left off. There are no transient states to recover from -- items are either `todo` (available for dev processing), `done`, or `failed`. On resume, `todo` items are dispatched to dev and `done`/`failed` items are skipped.
+If a shift is interrupted, `/nightshift:start` picks up where it left off. There are no transient states to recover from -- items are either `todo` (available for dev processing), `done`, or `failed`. On resume, `todo` items are dispatched to dev and `done`/`failed` items are skipped.
 
 ### Graceful degradation
 
@@ -493,21 +509,29 @@ Add `.claude/worktrees/` to each target repo's `.gitignore` so worktree contents
 ## Project Layout
 
 ```
-night-shift/
-  src/                       # TypeScript CLI source (init command)
+nightshift/
+  .claude-plugin/
+    marketplace.json         # marketplace catalog (lists this one plugin)
+  plugins/
+    nightshift/
+      .claude-plugin/
+        plugin.json          # plugin manifest
+      agents/
+        manager.md           # the manager subagent
+      skills/
+        start/SKILL.md       # /nightshift:start
+        create/SKILL.md      # /nightshift:create (incl. project bootstrap)
+        add-task/SKILL.md
+        update-table/SKILL.md
+        do-task/SKILL.md
+        test-task/SKILL.md
+        archive/SKILL.md
+        doctor/SKILL.md      # /nightshift:doctor (dep check)
+  src/                       # TypeScript source for the deprecated npm CLI stub
   bin/                       # CLI entry script
   dist/                      # Compiled output (generated by build)
-  templates/
-    claude/
-      agents/                # Claude Code subagent definitions
-      skills/                # Claude Code skill directories (SKILL.md + scripts/)
-      CLAUDE.md              # CLAUDE.md template fragment
-      settings.json          # .claude/settings.json template fragment
-  .claude-plugin/            # Claude Code Plugin manifest
-  agents/                    # (build output) plugin-bundled subagents
-  skills/                    # (build output) plugin-bundled skills
-  test/                      # Integration tests (init + shift execution)
-  .nightshift/               # Active and archived shifts (in target projects)
+  test/                      # Integration tests (drives the plugin via --plugin-dir)
+  .nightshift/               # Active and archived shifts (created lazily in target projects)
 ```
 
 ## License
