@@ -1,18 +1,18 @@
 {
   "nightshift-start": {
-    "durationMs": 227853,
-    "updatedAt": "2026-05-15T16:08:02.396Z"
+    "durationMs": 230289,
+    "updatedAt": "2026-05-18T16:22:13.878Z"
   },
   "nightshift-start-parallel": {
-    "durationMs": 85505,
-    "updatedAt": "2026-05-15T16:09:27.905Z"
+    "durationMs": 131729,
+    "updatedAt": "2026-05-18T16:24:25.612Z"
   },
   "nightshift-start-no-self-improvement": {
-    "durationMs": 215547,
-    "updatedAt": "2026-05-15T16:13:03.455Z"
+    "durationMs": 233660,
+    "updatedAt": "2026-05-18T16:28:19.274Z"
   },
   "nightshift-start-parallel-no-self-improvement": {
-    "durationMs": 93146,
-    "updatedAt": "2026-05-15T16:14:36.603Z"
+    "durationMs": 143373,
+    "updatedAt": "2026-05-18T16:30:42.651Z"
   }
 }
