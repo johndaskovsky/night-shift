@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.1] - 2026-05-18
+
+### Changed
+
+- Update changelog [skip ci]
+
+### Other
+
+- Use explicit relative path for plugin source in marketplace.json
+
+Claude Code 2.1.143 rejects the bare-string source form (`"source":
+"nightshift"` abbreviated via `metadata.pluginRoot`) with "This plugin
+uses a source type your Claude Code version does not support." Switch
+to the canonical `"source": "./plugins/nightshift"` form documented at
+code.claude.com/docs/en/plugin-marketplaces and drop the now-unused
+`pluginRoot` metadata.
+- Namespace skill names so slash commands appear as /nightshift:<skill>
+
+Plugin skills are not auto-prefixed by Claude Code's slash-command picker
+when invoked, so the 4.0.0 migration's intended `/nightshift:<skill>`
+form was showing up as bare `/start`, `/doctor`, etc. Embed the
+`nightshift:` namespace directly in each skill's `name:` field so the
+picker matches the documented invocation pattern and the manager /
+dispatch-batch.sh `claude -p "/nightshift:do-task ..."` calls resolve to
+a registered slash command.
+
+Bump to 4.0.1 (patch — aligns runtime behavior with documented intent;
+internal callers already used the namespaced form).
+
 ## [4.0.0] - 2026-05-18
 
 ### Changed
