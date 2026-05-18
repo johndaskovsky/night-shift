@@ -1,5 +1,5 @@
 ---
-name: archive
+name: nightshift:archive
 description: Archive a Nightshift shift by moving its directory to .nightshift/archive/YYYY-MM-DD-<name>/. Use when the user invokes /nightshift:archive.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(test *) Bash(ls *)

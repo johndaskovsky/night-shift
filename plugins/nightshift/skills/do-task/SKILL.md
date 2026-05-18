@@ -1,5 +1,5 @@
 ---
-name: do-task
+name: nightshift:do-task
 description: Execute one Nightshift task on one item, self-validate, retry on failure, and emit a structured result. Invoked by manager via `claude -p` subprocess; runs in a fresh top-level Claude Code session and inherits all user-configured MCPs.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(mkdir *)

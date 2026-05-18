@@ -1,5 +1,5 @@
 ---
-name: test-task
+name: nightshift:test-task
 description: Run a single Nightshift task on a single table item for testing — without modifying table.csv or manager.md. Spawns a claude -p subprocess of /nightshift:do-task with --read-only. Use when the user invokes /nightshift:test-task.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(test *) Bash(ls *) Bash(claude *)

@@ -1,5 +1,5 @@
 ---
-name: start
+name: nightshift:start
 description: Start or resume execution of a Nightshift shift by forking into the manager subagent. Use when the user invokes /nightshift:start.
 disable-model-invocation: true
 context: fork

@@ -1,5 +1,5 @@
 ---
-name: create
+name: nightshift:create
 description: Create a new Nightshift shift — a structured unit of batch agent work — with manager.md and an empty table.csv. Use when the user invokes /nightshift:create.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(mkdir *) Bash(test *)

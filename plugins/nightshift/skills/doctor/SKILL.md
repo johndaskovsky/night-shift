@@ -1,5 +1,5 @@
 ---
-name: doctor
+name: nightshift:doctor
 description: Verify that Nightshift's required system dependencies (qsv, flock, jq) are installed and on PATH. Use when the user invokes /nightshift:doctor.
 disable-model-invocation: true
 allowed-tools: Bash(command *) Bash(qsv *) Bash(flock *) Bash(jq *)

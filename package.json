@@ -1,6 +1,6 @@
 {
   "name": "@johndaskovsky/nightshift",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Deprecation shim for the Nightshift CLI. Nightshift is now distributed as a Claude Code plugin — install via /plugin marketplace add johndaskovsky/nightshift.",
   "keywords": [
     "nightshift",

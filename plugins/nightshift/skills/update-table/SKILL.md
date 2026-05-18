@@ -1,5 +1,5 @@
 ---
-name: update-table
+name: nightshift:update-table
 description: Make bulk changes to a Nightshift shift's table.csv — add rows, update metadata, or reset failed items. Use when the user invokes /nightshift:update-table.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(mv *) Bash(rm *) Bash(test *) Bash(ls *)

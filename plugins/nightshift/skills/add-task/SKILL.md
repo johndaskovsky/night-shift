@@ -1,5 +1,5 @@
 ---
-name: add-task
+name: nightshift:add-task
 description: Add a task definition to an existing Nightshift shift, registering it in manager.md and adding a status column to table.csv. Use when the user invokes /nightshift:add-task.
 disable-model-invocation: true
 allowed-tools: Bash(qsv *) Bash(flock *) Bash(mv *) Bash(test *) Bash(ls *)
