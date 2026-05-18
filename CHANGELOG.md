@@ -4,47 +4,65 @@ All notable changes to this project will be documented in this file.
 
 ## [4.0.0] - 2026-05-18
 
-### BREAKING
+### Changed
 
-- **Distribution model: plugin marketplace only.** Nightshift is now distributed as a Claude Code plugin via its own marketplace at `johndaskovsky/nightshift`. Install with:
+- Update changelog [skip ci]
 
-  ```
-  /plugin marketplace add johndaskovsky/nightshift
-  /plugin install nightshift@nightshift
-  ```
+### Other
 
-  The npm package `@johndaskovsky/nightshift` survives as a deprecation artifact: `nightshift init` now only prints these instructions and exits 0. It performs no scaffolding, no file writes, no dependency checks.
+- Migrate Nightshift to Claude Code plugin marketplace; bump to 4.0.0
 
-- **Slash command rename.** Plugin skills are namespaced by the plugin name, so the commands change from `/nightshift-<skill>` to `/nightshift:<skill>`. Updated commands:
+BREAKING. Distribution model changes from a TypeScript npm CLI to a
+Claude Code plugin distributed via its own marketplace. The npm package
+survives as a deprecation shim — `nightshift init` only prints the new
+install instructions and exits 0.
 
-  | Old | New |
-  |---|---|
-  | `/nightshift-create` | `/nightshift:create` |
-  | `/nightshift-add-task` | `/nightshift:add-task` |
-  | `/nightshift-update-table` | `/nightshift:update-table` |
-  | `/nightshift-start` | `/nightshift:start` |
-  | `/nightshift-test-task` | `/nightshift:test-task` |
-  | `/nightshift-archive` | `/nightshift:archive` |
-  | `/nightshift-do-task` | `/nightshift:do-task` (internal) |
+Repo layout
+- `.claude-plugin/marketplace.json` catalogs the single plugin.
+- `plugins/nightshift/` holds the canonical plugin (manifest, manager
+  agent, and eight skills). Authored directly; no more templates layer.
+- `templates/`, the materialized root `agents/`/`skills/`, and
+  `src/core/{scaffolder,dependencies,templates}.ts` are deleted.
+- `build.js` reduces to TypeScript compile + plugin-manifest version
+  sync.
 
-### Added
+Slash command rename
+- Skills are namespaced by the plugin, so `/nightshift-<skill>` becomes
+  `/nightshift:<skill>` across the board. Skill folders drop the
+  `nightshift-` prefix; manager agent renames `nightshift-manager.md` →
+  `manager.md`.
 
-- **`/nightshift:doctor` skill.** Replaces the install-time dependency check from the deprecated CLI. Run it once after install to verify `qsv`, `flock`, and `jq` are on PATH; prints `brew install` hints for any missing.
-- **Project bootstrap moves to `/nightshift:create`.** The skill idempotently creates `.nightshift/archive/` and `.nightshift/.gitignore` (if missing) on every invocation, replacing the work that `nightshift init` used to do. A fresh project never needs a separate init step.
+Project bootstrap moves to `/nightshift:create`
+- `init-shift.sh` now idempotently creates `.nightshift/archive/` and
+  `.nightshift/.gitignore` (if absent) before scaffolding the shift
+  directory. Replaces the work `nightshift init` used to do.
 
-### Removed
+New `/nightshift:doctor` skill
+- Replaces the install-time dependency check from the deprecated CLI.
+  Verifies `qsv`, `flock`, `jq` on PATH and prints `brew install` hints
+  for any missing.
 
-- `templates/` directory (plugin files are authored directly under `plugins/nightshift/`).
-- `src/core/scaffolder.ts`, `src/core/dependencies.ts`, `src/core/templates.ts`.
-- The CLAUDE.md merge (already removed in the in-flight `drop-claude-md-merge` change, which this migration absorbs). Existing `~/CLAUDE.md` blocks from prior installs are left untouched; users can delete the marker-delimited section manually.
-- The `.claude/settings.json` permissions-allow merge. Each plugin skill declares its needs via `allowed-tools` frontmatter. If Claude Code does not auto-grant, users add `Bash(qsv *)` / `Bash(flock *)` / `Bash(claude *)` / `Bash(jq *)` to `~/.claude/settings.json` once. See the README "Permissions" section.
+Tests
+- `test/init-tests.ts` deleted (the suite tested scaffolder behavior
+  that no longer exists). `test/run-tests.ts` invokes `claude` with
+  `--plugin-dir ./plugins/nightshift` and types the new `/nightshift:`
+  commands.
 
-### Migration from 3.x
+Docs
+- README, AGENTS.md, CHANGELOG fully rewritten for the plugin install
+  path, the new commands, and the 3.x → 4.x migration steps.
 
-1. Run the new plugin install commands above.
-2. Delete any project-local `<project>/.claude/skills/nightshift-*/` directories — they will shadow the plugin via Claude Code's precedence rules. Your `.nightshift/<shift>/` data is unaffected.
-3. Update any automation or documentation that types `/nightshift-` to use `/nightshift:`.
-4. Run `/nightshift:doctor` to verify `qsv`, `flock`, `jq` are installed.
+OpenSpec
+- The `migrate-to-plugin-marketplace` change is archived under
+  `openspec/changes/archive/2026-05-18-…/`. Delta specs synced into
+  `openspec/specs/`: created `plugin-distribution` and
+  `nightshift-doctor`; modified `nightshift-installer`,
+  `nightshift-commands`, `nightshift-agents`, `gitignore-scaffold`,
+  `claude-code-target`; deleted `cli-dependency-verification`.
+
+Verified locally: typecheck clean, build clean, deprecation stub
+prints correctly. Smoke tests requiring a live Claude Code session
+(Group 12 in tasks.md) are deferred for post-push validation.
 
 ## [3.1.0] - 2026-05-15
 
